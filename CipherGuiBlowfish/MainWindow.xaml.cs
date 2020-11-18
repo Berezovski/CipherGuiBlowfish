@@ -10,9 +10,9 @@ namespace CipherGuiBlowfish
 {
     public partial class MainWindow : Window
     {
-
         // байты считанного файла
         byte[] _userFile;
+
         public MainWindow()
         {
             InitializeComponent();
