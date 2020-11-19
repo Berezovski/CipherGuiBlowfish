@@ -87,7 +87,7 @@
             </Grid>
         </GroupBox>
         <Menu Grid.ColumnSpan="2">
-            <MenuItem x:Name="MenuItem_File" Header="Файл" HorizontalContentAlignment="Center" Click="MenuItem_File_Click"/>
+            <MenuItem x:Name="MenuItem_File" Header="Файл" HorizontalContentAlignment="Center"/>
         </Menu>
         <Menu Grid.Column="2" Grid.ColumnSpan="3">
             <MenuItem x:Name="MenuItem_Author" Header="Автор" Click="MenuItem_Author_Click"/>

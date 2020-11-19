@@ -64,13 +64,13 @@
       <DependentUpon>AboutMe.xaml</DependentUpon>
     </Compile>
     <Compile Include="Blowfish.cs" />
-    <Compile Include="GF.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="WorkWithBits.cs" />
+    <Compile Include="WorkWithFile.cs" />
     <Page Include="AboutMe.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

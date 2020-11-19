@@ -21,27 +21,18 @@ namespace CipherGuiBlowfish
 
         private void Button_FindFile_Click(object sender, RoutedEventArgs e)
         {
+            string filePath;
+            _userFile = WorkWithFile.ReadAllBytesWithOpenFileDialog(out filePath);
 
-            OpenFileDialog fileDialog = new OpenFileDialog();
-            if (fileDialog.ShowDialog() == true)
+            if (_userFile == null)
             {
-                Label_FilePath.Content = fileDialog.FileName;
+                AppendInConsoleLine("Не считал файл");
             }
             else
             {
-                return;
+                Label_FilePath.Content = filePath;
+                AppendInConsoleLine("Считал файл: " + filePath);
             }
-
-            FileInfo infoFile = new FileInfo((string)Label_FilePath.Content);
-            _userFile = new byte[infoFile.Length];
-
-            using (BinaryReader strReader = new BinaryReader(File.Open((string)Label_FilePath.Content, FileMode.Open), Encoding.UTF8))
-            {
-                strReader.Read(_userFile, 0, _userFile.Length);
-            }
-
-            MyConsole.AppendText("Считал файл:\n");
-            MyConsole.AppendText(Label_FilePath.Content + "\n");
 
         }
 
@@ -49,12 +40,12 @@ namespace CipherGuiBlowfish
         {           
             if (_userFile.Length == 0)
             {
-                MyConsole.AppendText("Ошибка! Файл пуст или вы забыли его считать\n");
+                AppendInConsoleLine("Ошибка! Файл пуст или вы забыли его считать");
                 return;
             }
             if (UserKey.Password.Length == 0)
             {
-                MyConsole.AppendText("Ошибка! Не ввели пароль (он не может быть 0 символов)\n");
+                AppendInConsoleLine("Ошибка! Не ввели пароль (он не может быть 0 символов)");
                 return;
             }
 
@@ -76,16 +67,16 @@ namespace CipherGuiBlowfish
                 default: 
                     break;
             }
-            MyConsole.AppendText("Зашифровал файл:\n");
-            MyConsole.AppendText(Label_FilePath.Content + "\n");
+            AppendInConsoleLine("Зашифровал файл: " + Label_FilePath.Content);
 
-            using (BinaryWriter strWr = new BinaryWriter(File.Open((string)Label_FilePath.Content, FileMode.Create), Encoding.UTF8))
+            if (WorkWithFile.WriteALLBytes((string)Label_FilePath.Content, _userFile) == true)
             {
-                strWr.Write(_userFile, 0, _userFile.Length);
-                strWr.Flush();
+                AppendInConsoleLine("== Сохранил результат ==");
             }
-
-            MyConsole.AppendText("==Сохранил результат==\n");
+            else
+            {
+                AppendInConsoleLine("== Не удалось сохранить результат ==");
+            }
 
             _userFile = new byte[0];
             Label_FilePath.Content = "-";
@@ -95,12 +86,12 @@ namespace CipherGuiBlowfish
         {
             if (_userFile.Length == 0)
             {
-                MyConsole.AppendText("Ошибка! Файл пуст или вы забыли его считать\n");
+                MyConsole.AppendText("Ошибка! Файл пуст или вы забыли его считать");
                 return;
             }
             if (UserKey.Password.Length == 0)
             {
-                MyConsole.AppendText("Ошибка! Не ввели пароль (он не может быть 0 символов)\n");
+                MyConsole.AppendText("Ошибка! Не ввели пароль (он не может быть 0 символов)");
                 return;
             }
 
@@ -122,24 +113,19 @@ namespace CipherGuiBlowfish
                 default:
                     break;
             }
+            AppendInConsoleLine("Расшифровал файл: " + Label_FilePath.Content);
 
-            MyConsole.AppendText("Расшифровал файл:\n");
-            MyConsole.AppendText(Label_FilePath.Content + "\n");
-
-            using (BinaryWriter strWr = new BinaryWriter(File.Open((string)Label_FilePath.Content, FileMode.Create), Encoding.UTF8))
+            if (WorkWithFile.WriteALLBytes((string)Label_FilePath.Content, _userFile) == true)
             {
-                strWr.Write(_userFile, 0, _userFile.Length);
-                strWr.Flush();
+                AppendInConsoleLine("== Сохранил результат ==");
             }
-            MyConsole.AppendText("==Сохранил результат==\n");
+            else
+            {
+                AppendInConsoleLine("== Не удалось сохранить результат ==");
+            }
 
             _userFile = new byte[0];
             Label_FilePath.Content = "-";
-        }
-
-        private void MenuItem_File_Click(object sender, RoutedEventArgs e)
-        {
-
         }
 
         private void MenuItem_Author_Click(object sender, RoutedEventArgs e)
@@ -152,5 +138,11 @@ namespace CipherGuiBlowfish
         {
             Close();
         }
+
+        private void AppendInConsoleLine(string text)
+        {
+            MyConsole.AppendText(text + "\n");
+        }
+
     }
 }
