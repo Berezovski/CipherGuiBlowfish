@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace BlowfishAlgorithm
@@ -214,6 +215,103 @@ namespace BlowfishAlgorithm
             _Sblocks = new ulong[4][] { _S1, _S2, _S3, _S4 };
             _beginingBlock = beginningBlock;
         }
+
+        /// <summary>
+        /// Шифрует данные text, ключом userkey (Режим электронной книги) многопоточно в 3-4 раза быстрее
+        /// </summary>
+        /// <param name="text"> Текст, который будет шифроваться </param> 
+        /// <param name="userkey"> Ключ, вводимый для шифрования </param>
+        /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
+        public async Task<byte[]> ECB_MultithreadedChipher(byte[] text, byte[] userkey)
+        {
+            if ((userkey.Length == 0) || (text.Length == 0))
+            {
+                throw new ArgumentException("Длины текста и ключа в байтах равны " + text.Length +
+                    ", " + userkey.Length + " (не должны быть == 0)");
+            }
+
+            int processorCount = Environment.ProcessorCount;
+            if (processorCount == 1) // многопоточность бесполезна
+            {
+                return ECB_Chipher(text, userkey);
+            }
+            if (text.Length / (processorCount * 8) == 0) // многопоточность бесполезна
+            {
+                return ECB_Chipher(text, userkey);
+            }
+
+            byte[][] splitedText = FullTextToSplitedTextForThreads(text);
+            
+            // последний сплит с инфо блоком
+            splitedText[splitedText.Length - 1] = GetBlocksAndAppendInfoBlock(splitedText[splitedText.Length-1]);
+
+            uint[] roundsKeys = KeyGeneration(userkey);
+
+            Task<byte[]>[] allTasks= new Task<byte[]>[processorCount];
+            for (int i = 0; i < processorCount; i++)
+            {
+                int indexI = i; // т.к. значение i может поменяться EndInvoke
+                allTasks[indexI] = Task.Run(() => MultithreadedChipherSplitedBlock_ForECB(splitedText[indexI], roundsKeys));
+            }
+            await Task.WhenAll(allTasks);
+
+            for (int i = 0; i < processorCount; i++)
+            {
+                splitedText[i] = allTasks[i].Result;
+            }
+
+            byte[] answer = SplitedTextToFullTextAfterThreads(splitedText);
+            return answer;
+        }
+
+        /// <summary>
+        /// Дешифрует данные text, ключом userkey (Режим электронной книги) многопоточно в 3-4 раза быстрее 
+        /// </summary>
+        /// <param name="text"> Текст, который будет дешифроваться (больше 64 бит, иначе просто вернёт текст) </param> 
+        /// <param name="userkey"> Ключ, вводимый для дешифрования </param> 
+        /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
+        public async Task<byte[]> ECB_MultithreadedDechipher(byte[] text, byte[] userkey)
+        {
+            if ((userkey.Length == 0) || (text.Length == 0))
+            {
+                throw new ArgumentException("Длины текста и ключа в байтах равны " + text.Length +
+                    ", " + userkey.Length + " (не должны быть == 0)");
+            }
+            if (text.Length < 9)
+            {
+                return text;
+            }
+
+            int processorCount = Environment.ProcessorCount;
+            if (processorCount == 1) // многопоточность бесполезна
+            {
+                return ECB_Dechipher(text, userkey);
+            }
+            if (text.Length/(processorCount*8) == 0) // многопоточность бесполезна
+            {
+                return ECB_Dechipher(text, userkey);
+            }
+
+            byte[][] splitedText = FullTextToSplitedTextForThreads(text);
+            uint[] roundsKeys = KeyGeneration(userkey);
+
+            Task<byte[]>[] allTasks = new Task<byte[]>[processorCount];
+            for (int i = 0; i < processorCount; i++)
+            {
+                int indexI = i; // т.к. значение i меняется
+                allTasks[indexI] = Task.Run(() => MultithreadedDechipherSplitedBlock_ForECB(splitedText[indexI], roundsKeys));
+            }
+            await Task.WhenAll(allTasks);
+
+            for (int i = 0; i < processorCount; i++)
+            {
+                splitedText[i] = allTasks[i].Result;
+            }
+            splitedText[splitedText.Length - 1] = GetBytesWithoutInfoBlock(splitedText[splitedText.Length - 1]);
+
+            byte[] answer = SplitedTextToFullTextAfterThreads(splitedText);
+            return answer;
+        }     
 
         /// <summary>
         /// Шифрует данные text, ключом userkey (Режим электронной книги)
@@ -486,6 +584,85 @@ namespace BlowfishAlgorithm
 
             // достаем его реальные байты из массива ulong (без дополнительного блока)
             return GetBytesWithoutInfoBlock(LongArrayToByteArray(blocks));
+        }
+
+        private byte[] MultithreadedChipherSplitedBlock_ForECB(byte[] splitedText, uint[] roundsKeys)
+        {
+            uint[] copyRoundKeys = (uint[])roundsKeys.Clone();
+
+            //Достаём Блоки, к которым уже добавлен блок информации (о предпоследнем блоке)
+            ulong[] readyBlocks = ByteArrayToLongArray(splitedText);
+
+            // после этого цикла readyBlocks будет уже зашифрованный текст
+            for (int i = 0; i < readyBlocks.Length; i++)
+            {
+                readyBlocks[i] = Cipher(readyBlocks[i], copyRoundKeys);
+            }
+
+            return LongArrayToByteArray(readyBlocks);
+        }
+
+        private byte[] MultithreadedDechipherSplitedBlock_ForECB(byte[] splitedText, uint[] roundsKeys)
+        {
+            ulong[] blocks = ByteArrayToLongArray(splitedText);
+            // достаем массив ulong для дешифра
+            uint[] copyRoundsKeys = (uint[])roundsKeys.Clone();
+
+            // после этого цикла blocks будет уже расшифрованный текст
+            for (int i = 0; i < blocks.Length; i++)
+            {
+                blocks[i] = Decipher(blocks[i], roundsKeys);
+            }
+
+            // достаем его реальные байты из массива ulong (без дополнительного блока)
+            return LongArrayToByteArray(blocks);
+        }
+
+        private byte[][] FullTextToSplitedTextForThreads(byte[] text)
+        {
+            int processorCount = Environment.ProcessorCount;
+
+            int splitedTextBlockCount = text.Length / (processorCount * 8);
+            int splitedTextBlock_ByteLength = splitedTextBlockCount * 8;
+            int splitedTextBlock_ByteLengthLastTextBlock = splitedTextBlock_ByteLength + text.Length % (splitedTextBlock_ByteLength * processorCount);
+
+            byte[][] answer = new byte[processorCount][];
+
+            for (int i = 0; i < processorCount; i++)
+            {
+                if (i == processorCount - 1)
+                {
+                    answer[i] = new byte[splitedTextBlock_ByteLengthLastTextBlock];
+                    Array.Copy(text, i * splitedTextBlock_ByteLength, answer[i], 0, splitedTextBlock_ByteLengthLastTextBlock);
+                    break;
+                }
+
+                answer[i] = new byte[splitedTextBlock_ByteLength];
+                Array.Copy(text, i * splitedTextBlock_ByteLength, answer[i], 0, splitedTextBlock_ByteLength);
+            }
+
+            return answer;
+        }
+
+        private byte[] SplitedTextToFullTextAfterThreads(byte[][] splitedText)
+        {
+            int answerLength = 0;
+            int splitedTextLengthWithoutLast = splitedText[0].Length;
+
+            // длина всего answer
+            for (int i = 0; i < splitedText.Length; i++)
+            {
+                answerLength += splitedText[i].Length;
+            }
+
+            byte[] answer = new byte[answerLength];
+
+            for (int i = 0; i < splitedText.Length; i++)
+            {
+                Array.Copy(splitedText[i], 0, answer, i * splitedTextLengthWithoutLast, splitedText[i].Length);
+            }
+
+            return answer;
         }
 
         // Получаем блоки по 64 бит (последний блок отвечает за информацию о предпоследнем блоке)

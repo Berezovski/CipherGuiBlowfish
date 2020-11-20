@@ -73,6 +73,7 @@
                     <ComboBoxItem Content="CBC" HorizontalAlignment="Left" Width="174.4"/>
                     <ComboBoxItem Content="OFB" HorizontalAlignment="Left" Width="174.4"/>
                     <ComboBoxItem Content="CFB" HorizontalAlignment="Left" Width="174.4"/>
+                    <ComboBoxItem Content="ECB (ускоренный)" HorizontalAlignment="Left" Width="174.4"/>
                 </ComboBox>
                 <Button x:Name="DecipherFile" Content="Расшифровка" Click="DecipherFile_Click" Grid.Row="5" Grid.Column="1"/>
                 <ComboBox x:Name="ComboBox_RijndailTextLength" AutomationProperties.Name="ComboBox_ModeDes" SelectedIndex="0" Grid.Row="3" Grid.Column="5">

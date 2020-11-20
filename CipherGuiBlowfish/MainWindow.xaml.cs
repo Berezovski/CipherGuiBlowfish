@@ -36,7 +36,7 @@ namespace CipherGuiBlowfish
 
         }
 
-        private void CipherFile_Click(object sender, RoutedEventArgs e)
+        private async void CipherFile_Click(object sender, RoutedEventArgs e)
         {           
             if (_userFile.Length == 0)
             {
@@ -64,6 +64,9 @@ namespace CipherGuiBlowfish
                 case 3: // CFB
                     _userFile = blowfi.CFB_Chipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
+                case 4: // ECB - многопоточный
+                    _userFile = await blowfi.ECB_MultithreadedChipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    break;
                 default: 
                     break;
             }
@@ -82,7 +85,7 @@ namespace CipherGuiBlowfish
             Label_FilePath.Content = "-";
         }
 
-        private void DecipherFile_Click(object sender, RoutedEventArgs e)
+        private async void DecipherFile_Click(object sender, RoutedEventArgs e)
         {
             if (_userFile.Length == 0)
             {
@@ -109,6 +112,9 @@ namespace CipherGuiBlowfish
                     break;
                 case 3: // CFB
                     _userFile = blowfi.CFB_Dechipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    break;
+                case 4: // ECB - многопоточный
+                    _userFile = await blowfi.ECB_MultithreadedDechipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
                 default:
                     break;
