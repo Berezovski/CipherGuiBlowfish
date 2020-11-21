@@ -53,21 +53,22 @@ namespace CipherGuiBlowfish
             switch (ComboBox_ModeDes.SelectedIndex)
             {
                 case 0: // ECB
-                    _userFile = blowfi.ECB_Chipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.ECB_Encrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
                 case 1: // CBC
-                    _userFile = blowfi.CBC_Chipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.CBC_Encrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
                 case 2: // OFB
-                    _userFile = blowfi.OFB_Chipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.OFB_Encrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
                 case 3: // CFB
-                    _userFile = blowfi.CFB_Chipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.CFB_Encrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
-                case 4: // ECB - многопоточный
-                    _userFile = await blowfi.ECB_MultithreadedChipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                case 4: // ECB - многопоточный 
+                    _userFile = await blowfi.ECB_MultithreadedEncrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
-                default: 
+                default: // default будет ECB
+                    _userFile = await blowfi.ECB_MultithreadedEncrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
             }
             AppendInConsoleLine("Зашифровал файл: " + Label_FilePath.Content);
@@ -102,21 +103,22 @@ namespace CipherGuiBlowfish
             switch (ComboBox_ModeDes.SelectedIndex)
             {
                 case 0: // ECB
-                    _userFile = blowfi.ECB_Dechipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.ECB_Decrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
                 case 1: // CBC
-                    _userFile = blowfi.CBC_Dechipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.CBC_Decrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
                 case 2: // OFB
-                    _userFile = blowfi.OFB_Dechipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.OFB_Decrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
                 case 3: // CFB
-                    _userFile = blowfi.CFB_Dechipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                    _userFile = blowfi.CFB_Decrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
-                case 4: // ECB - многопоточный
-                    _userFile = await blowfi.ECB_MultithreadedDechipher(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
+                case 4: // ECB - многопоточный 
+                    _userFile = await blowfi.ECB_MultithreadedDecrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
-                default:
+                default: // default будет ECB
+                    _userFile = await blowfi.ECB_MultithreadedDecrypt(_userFile, Encoding.UTF8.GetBytes(UserKey.Password.ToString()));
                     break;
             }
             AppendInConsoleLine("Расшифровал файл: " + Label_FilePath.Content);

@@ -9,6 +9,8 @@ namespace BlowfishAlgorithm
 {
     /// <summary>
     /// Алгоритм Blowfish в 4-ёх режимах
+    /// В одном режиме реализовано многопоточное шифрование
+    /// (другими режимами эффективное многопоточное шифрование невозможно, т.к. строгая зависимость блока от предыдущих)
     /// </summary>
     class Blowfish
     {
@@ -207,7 +209,7 @@ namespace BlowfishAlgorithm
         };
 
         /// <summary>
-        /// Выводит нужный бит
+        /// Конструктор
         /// </summary>
         /// <param name="beginningBlock"> Блок, с которого начинается шифрование в CBC, OFB, CFB </param> 
         public Blowfish(ulong beginningBlock)
@@ -222,7 +224,7 @@ namespace BlowfishAlgorithm
         /// <param name="text"> Текст, который будет шифроваться </param> 
         /// <param name="userkey"> Ключ, вводимый для шифрования </param>
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public async Task<byte[]> ECB_MultithreadedChipher(byte[] text, byte[] userkey)
+        public async Task<byte[]> ECB_MultithreadedEncrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -233,25 +235,25 @@ namespace BlowfishAlgorithm
             int processorCount = Environment.ProcessorCount;
             if (processorCount == 1) // многопоточность бесполезна
             {
-                return ECB_Chipher(text, userkey);
+                return ECB_Encrypt(text, userkey);
             }
             if (text.Length / (processorCount * 8) == 0) // многопоточность бесполезна
             {
-                return ECB_Chipher(text, userkey);
+                return ECB_Encrypt(text, userkey);
             }
 
             byte[][] splitedText = FullTextToSplitedTextForThreads(text);
-            
+
             // последний сплит с инфо блоком
-            splitedText[splitedText.Length - 1] = GetBlocksAndAppendInfoBlock(splitedText[splitedText.Length-1]);
+            splitedText[splitedText.Length - 1] = GetBlocksAndAppendInfoBlock(splitedText[splitedText.Length - 1]);
 
             uint[] roundsKeys = KeyGeneration(userkey);
 
-            Task<byte[]>[] allTasks= new Task<byte[]>[processorCount];
+            Task<byte[]>[] allTasks = new Task<byte[]>[processorCount];
             for (int i = 0; i < processorCount; i++)
             {
                 int indexI = i; // т.к. значение i может поменяться EndInvoke
-                allTasks[indexI] = Task.Run(() => MultithreadedChipherSplitedBlock_ForECB(splitedText[indexI], roundsKeys));
+                allTasks[indexI] = Task.Run(() => MultithreadedEncryptSplitedBlock_ForECB(splitedText[indexI], roundsKeys));
             }
             await Task.WhenAll(allTasks);
 
@@ -265,12 +267,12 @@ namespace BlowfishAlgorithm
         }
 
         /// <summary>
-        /// Дешифрует данные text, ключом userkey (Режим электронной книги) многопоточно в 3-4 раза быстрее 
+        /// Дешифрует данные text, ключом userkey (Режим электронной книги) многопоточно в 3-4 раза быстрее  
         /// </summary>
         /// <param name="text"> Текст, который будет дешифроваться (больше 64 бит, иначе просто вернёт текст) </param> 
         /// <param name="userkey"> Ключ, вводимый для дешифрования </param> 
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public async Task<byte[]> ECB_MultithreadedDechipher(byte[] text, byte[] userkey)
+        public async Task<byte[]> ECB_MultithreadedDecrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -285,11 +287,11 @@ namespace BlowfishAlgorithm
             int processorCount = Environment.ProcessorCount;
             if (processorCount == 1) // многопоточность бесполезна
             {
-                return ECB_Dechipher(text, userkey);
+                return ECB_Decrypt(text, userkey);
             }
-            if (text.Length/(processorCount*8) == 0) // многопоточность бесполезна
+            if (text.Length / (processorCount * 8) == 0) // многопоточность бесполезна
             {
-                return ECB_Dechipher(text, userkey);
+                return ECB_Decrypt(text, userkey);
             }
 
             byte[][] splitedText = FullTextToSplitedTextForThreads(text);
@@ -299,7 +301,7 @@ namespace BlowfishAlgorithm
             for (int i = 0; i < processorCount; i++)
             {
                 int indexI = i; // т.к. значение i меняется
-                allTasks[indexI] = Task.Run(() => MultithreadedDechipherSplitedBlock_ForECB(splitedText[indexI], roundsKeys));
+                allTasks[indexI] = Task.Run(() => MultithreadedDecryptSplitedBlock_ForECB(splitedText[indexI], roundsKeys));
             }
             await Task.WhenAll(allTasks);
 
@@ -311,7 +313,7 @@ namespace BlowfishAlgorithm
 
             byte[] answer = SplitedTextToFullTextAfterThreads(splitedText);
             return answer;
-        }     
+        }
 
         /// <summary>
         /// Шифрует данные text, ключом userkey (Режим электронной книги)
@@ -319,7 +321,7 @@ namespace BlowfishAlgorithm
         /// <param name="text"> Текст, который будет шифроваться </param> 
         /// <param name="userkey"> Ключ, вводимый для шифрования </param>
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] ECB_Chipher(byte[] text, byte[] userkey)
+        public byte[] ECB_Encrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -335,7 +337,7 @@ namespace BlowfishAlgorithm
             // после этого цикла readyBlocks будет уже зашифрованный текст
             for (int i = 0; i < readyBlocks.Length; i++)
             {
-                readyBlocks[i] = Cipher(readyBlocks[i], roundsKeys);
+                readyBlocks[i] = Encrypt(readyBlocks[i], roundsKeys);
             }
 
             return LongArrayToByteArray(readyBlocks);
@@ -347,7 +349,7 @@ namespace BlowfishAlgorithm
         /// <param name="text"> Текст, который будет дешифроваться (больше 64 бит, иначе просто вернёт текст) </param> 
         /// <param name="userkey"> Ключ, вводимый для дешифрования </param> 
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] ECB_Dechipher(byte[] text, byte[] userkey)
+        public byte[] ECB_Decrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -367,7 +369,7 @@ namespace BlowfishAlgorithm
             // после этого цикла blocks будет уже расшифрованный текст
             for (int i = 0; i < blocks.Length; i++)
             {
-                blocks[i] = Decipher(blocks[i], roundsKeys);
+                blocks[i] = Decrypt(blocks[i], roundsKeys);
             }
 
             // достаем его реальные байты из массива ulong (без дополнительного блока)
@@ -380,7 +382,7 @@ namespace BlowfishAlgorithm
         /// <param name="text"> Текст, который будет шифроваться </param> 
         /// <param name="userkey"> Ключ, вводимый для шифрования </param> 
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] CBC_Chipher(byte[] text, byte[] userkey)
+        public byte[] CBC_Encrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -399,7 +401,7 @@ namespace BlowfishAlgorithm
             // после этого цикла readyBlocks будет уже зашифрованный текст
             for (int i = 0; i < readyBlocks.Length; i++)
             {
-                readyBlocks[i] = Cipher(forModeArray[i] ^ readyBlocks[i], roundsKeys);
+                readyBlocks[i] = Encrypt(forModeArray[i] ^ readyBlocks[i], roundsKeys);
                 forModeArray[i + 1] = readyBlocks[i];
             }
 
@@ -412,7 +414,7 @@ namespace BlowfishAlgorithm
         /// <param name="text"> Текст, который будет дешифроваться (больше 64 бит, иначе просто вернёт текст)</param> 
         /// <param name="userkey"> Ключ, вводимый для дешифрования </param> 
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] CBC_Dechipher(byte[] text, byte[] userkey)
+        public byte[] CBC_Decrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -437,78 +439,7 @@ namespace BlowfishAlgorithm
             for (int i = 0; i < blocks.Length; i++)
             {
                 forModeArray[i + 1] = blocks[i];
-                blocks[i] = forModeArray[i] ^ Decipher(blocks[i], roundsKeys);
-            }
-
-            // достаем его реальные байты из массива ulong (без дополнительного блока)
-            return GetBytesWithoutInfoBlock(LongArrayToByteArray(blocks));
-        }
-
-        /// <summary>
-        /// Шифрует данные text, ключом userkey (Режим обратной связи по шифротексту)
-        /// </summary>
-        /// <param name="text"> Текст, который будет шифроваться </param> 
-        /// <param name="userkey"> Ключ, вводимый для шифрования </param> 
-        /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] CFB_Chipher(byte[] text, byte[] userkey)
-        {
-            if ((userkey.Length == 0) || (text.Length == 0))
-            {
-                throw new ArgumentException("Длины текста и ключа в байтах равны " + text.Length +
-                    ", " + userkey.Length + " (не должны быть == 0)");
-            }
-
-            //Достаём Блоки, к которым уже добавлен блок информации (о предпоследнем блоке)
-            ulong[] readyBlocks = ByteArrayToLongArray(GetBlocksAndAppendInfoBlock(text));
-
-            // дополнительный массив с Z0 (только для 3-ёх режимов)
-            ulong[] forModeArray = new ulong[readyBlocks.Length + 1];
-            forModeArray[0] = _beginingBlock;
-
-            uint[] roundsKeys = KeyGeneration(userkey);
-
-            // после этого цикла readyBlocks будет уже зашифрованный текст
-            for (int i = 0; i < readyBlocks.Length; i++)
-            {
-                readyBlocks[i] = readyBlocks[i] ^ Cipher(forModeArray[i], roundsKeys);
-                forModeArray[i + 1] = readyBlocks[i];
-            }
-
-            return LongArrayToByteArray(readyBlocks);
-        }
-
-        /// <summary>
-        /// Дешифрует данные text, ключом userkey (Режим обратной связи по шифротексту)
-        /// </summary>
-        /// <param name="text"> Текст, который будет дешифроваться (больше 64 бит, иначе просто вернёт текст)</param> 
-        /// <param name="userkey"> Ключ, вводимый для дешифрования </param> 
-        /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] CFB_Dechipher(byte[] text, byte[] userkey)
-        {
-            if ((userkey.Length == 0) || (text.Length == 0))
-            {
-                throw new ArgumentException("Длины текста и ключа в байтах равны " + text.Length +
-                    ", " + userkey.Length + " (не должны быть == 0)");
-            }
-            if (text.Length < 9)
-            {
-                return text;
-            }
-
-            // достаем массив ulong для дешифра
-            ulong[] blocks = ByteArrayToLongArray(text);
-
-            // дополнительный массив с Z0 (только для 3-ёх режимов)
-            ulong[] forModeArray = new ulong[blocks.Length + 1];
-            forModeArray[0] = _beginingBlock;
-
-            uint[] roundsKeys = KeyGeneration(userkey);
-
-            // после этого цикла blocks будет уже расшифрованный текст
-            for (int i = 0; i < blocks.Length; i++)
-            {
-                forModeArray[i + 1] = blocks[i];
-                blocks[i] = blocks[i] ^ Cipher(forModeArray[i], roundsKeys);
+                blocks[i] = forModeArray[i] ^ Decrypt(blocks[i], roundsKeys);
             }
 
             // достаем его реальные байты из массива ulong (без дополнительного блока)
@@ -521,7 +452,7 @@ namespace BlowfishAlgorithm
         /// <param name="text"> Текст, который будет шифроваться </param> 
         /// <param name="userkey"> Ключ, вводимый для шифрования</param> 
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] OFB_Chipher(byte[] text, byte[] userkey)
+        public byte[] OFB_Encrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -541,7 +472,7 @@ namespace BlowfishAlgorithm
             // после этого цикла readyBlocks будет уже зашифрованный текст
             for (int i = 0; i < readyBlocks.Length; i++)
             {
-                forModeArray[i + 1] = Cipher(forModeArray[i], roundsKeys);
+                forModeArray[i + 1] = Encrypt(forModeArray[i], roundsKeys);
                 readyBlocks[i] = readyBlocks[i] ^ forModeArray[i + 1];
             }
 
@@ -554,7 +485,7 @@ namespace BlowfishAlgorithm
         /// <param name="text"> Текст, который будет дешифроваться (больше 64 бит, иначе просто вернёт текст)</param> 
         /// <param name="userkey"> Ключ, вводимый для дешифрования </param> 
         /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
-        public byte[] OFB_Dechipher(byte[] text, byte[] userkey)
+        public byte[] OFB_Decrypt(byte[] text, byte[] userkey)
         {
             if ((userkey.Length == 0) || (text.Length == 0))
             {
@@ -578,7 +509,7 @@ namespace BlowfishAlgorithm
             // после этого цикла blocks будет уже расшифрованный текст
             for (int i = 0; i < blocks.Length; i++)
             {
-                forModeArray[i + 1] = Cipher(forModeArray[i], roundsKeys);
+                forModeArray[i + 1] = Encrypt(forModeArray[i], roundsKeys);
                 blocks[i] = blocks[i] ^ forModeArray[i + 1];
             }
 
@@ -586,32 +517,99 @@ namespace BlowfishAlgorithm
             return GetBytesWithoutInfoBlock(LongArrayToByteArray(blocks));
         }
 
-        private byte[] MultithreadedChipherSplitedBlock_ForECB(byte[] splitedText, uint[] roundsKeys)
+        /// <summary>
+        /// Шифрует данные text, ключом userkey (Режим обратной связи по шифротексту)
+        /// </summary>
+        /// <param name="text"> Текст, который будет шифроваться </param> 
+        /// <param name="userkey"> Ключ, вводимый для шифрования </param> 
+        /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
+        public byte[] CFB_Encrypt(byte[] text, byte[] userkey)
         {
-            uint[] copyRoundKeys = (uint[])roundsKeys.Clone();
+            if ((userkey.Length == 0) || (text.Length == 0))
+            {
+                throw new ArgumentException("Длины текста и ключа в байтах равны " + text.Length +
+                    ", " + userkey.Length + " (не должны быть == 0)");
+            }
 
+            //Достаём Блоки, к которым уже добавлен блок информации (о предпоследнем блоке)
+            ulong[] readyBlocks = ByteArrayToLongArray(GetBlocksAndAppendInfoBlock(text));
+
+            // дополнительный массив с Z0 (только для 3-ёх режимов)
+            ulong[] forModeArray = new ulong[readyBlocks.Length + 1];
+            forModeArray[0] = _beginingBlock;
+
+            uint[] roundsKeys = KeyGeneration(userkey);
+
+            // после этого цикла readyBlocks будет уже зашифрованный текст
+            for (int i = 0; i < readyBlocks.Length; i++)
+            {
+                readyBlocks[i] = readyBlocks[i] ^ Encrypt(forModeArray[i], roundsKeys);
+                forModeArray[i + 1] = readyBlocks[i];
+            }
+
+            return LongArrayToByteArray(readyBlocks);
+        }
+
+        /// <summary>
+        /// Дешифрует данные text, ключом userkey (Режим обратной связи по шифротексту)
+        /// </summary>
+        /// <param name="text"> Текст, который будет дешифроваться (больше 64 бит, иначе просто вернёт текст)</param> 
+        /// <param name="userkey"> Ключ, вводимый для дешифрования </param> 
+        /// <exception cref="ArgumentException"> Длина ключа (или текста) == 0 </exception>
+        public byte[] CFB_Decrypt(byte[] text, byte[] userkey)
+        {
+            if ((userkey.Length == 0) || (text.Length == 0))
+            {
+                throw new ArgumentException("Длины текста и ключа в байтах равны " + text.Length +
+                    ", " + userkey.Length + " (не должны быть == 0)");
+            }
+            if (text.Length < 9)
+            {
+                return text;
+            }
+
+            // достаем массив ulong для дешифра
+            ulong[] blocks = ByteArrayToLongArray(text);
+
+            // дополнительный массив с Z0 (только для 3-ёх режимов)
+            ulong[] forModeArray = new ulong[blocks.Length + 1];
+            forModeArray[0] = _beginingBlock;
+
+            uint[] roundsKeys = KeyGeneration(userkey);
+
+            // после этого цикла blocks будет уже расшифрованный текст
+            for (int i = 0; i < blocks.Length; i++)
+            {
+                forModeArray[i + 1] = blocks[i];
+                blocks[i] = blocks[i] ^ Encrypt(forModeArray[i], roundsKeys);
+            }
+
+            // достаем его реальные байты из массива ulong (без дополнительного блока)
+            return GetBytesWithoutInfoBlock(LongArrayToByteArray(blocks));
+        }
+
+        private byte[] MultithreadedEncryptSplitedBlock_ForECB(byte[] splitedText, uint[] roundsKeys)
+        {
             //Достаём Блоки, к которым уже добавлен блок информации (о предпоследнем блоке)
             ulong[] readyBlocks = ByteArrayToLongArray(splitedText);
 
             // после этого цикла readyBlocks будет уже зашифрованный текст
             for (int i = 0; i < readyBlocks.Length; i++)
             {
-                readyBlocks[i] = Cipher(readyBlocks[i], copyRoundKeys);
+                readyBlocks[i] = Encrypt(readyBlocks[i], roundsKeys);
             }
 
             return LongArrayToByteArray(readyBlocks);
         }
 
-        private byte[] MultithreadedDechipherSplitedBlock_ForECB(byte[] splitedText, uint[] roundsKeys)
+        private byte[] MultithreadedDecryptSplitedBlock_ForECB(byte[] splitedText, uint[] roundsKeys)
         {
             ulong[] blocks = ByteArrayToLongArray(splitedText);
-            // достаем массив ulong для дешифра
-            uint[] copyRoundsKeys = (uint[])roundsKeys.Clone();
 
             // после этого цикла blocks будет уже расшифрованный текст
             for (int i = 0; i < blocks.Length; i++)
             {
-                blocks[i] = Decipher(blocks[i], roundsKeys);
+                blocks[i] = Decrypt(blocks[i], roundsKeys);
             }
 
             // достаем его реальные байты из массива ulong (без дополнительного блока)
@@ -738,7 +736,7 @@ namespace BlowfishAlgorithm
         }
 
         // Шифрование одного блока
-        private ulong Cipher(ulong textBit64, uint[] roundsKeys)
+        private ulong Encrypt(ulong textBit64, uint[] roundsKeys)
         {
             // правая-левая части
             ulong[] L = new ulong[18];
@@ -768,12 +766,12 @@ namespace BlowfishAlgorithm
         }
 
         // Дешифрование одного блока
-        private ulong Decipher(ulong textBit64, uint[] roundsKeys)
+        private ulong Decrypt(ulong textBit64, uint[] roundsKeys)
         {
             ulong[] L = new ulong[18];
             ulong[] R = new ulong[18];
 
-            // тут наоборот в отличии от Cipher
+            // тут наоборот в отличии от Encrypt
             L[17] = (textBit64 >> 32);
             R[17] = WorkWithBits.GetLowBits(textBit64, 32);
 
