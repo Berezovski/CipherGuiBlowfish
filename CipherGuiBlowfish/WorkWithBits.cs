@@ -34,11 +34,6 @@ namespace BlowfishAlgorithm
         /// <param name="count"> нужное количество младших битов, которые хотим получить; возможные значения [0, 64] </param> 
         public static ulong GetLowBits(ulong number, int count)
         {
-            // для скорости работы
-            if ((number >> count) == 0)
-            {
-                return number;
-            }
 
             if (Marshal.SizeOf(number) * 8 == count)
             {
@@ -121,7 +116,6 @@ namespace BlowfishAlgorithm
         /// <param name="endingPlace">  порядок конечного бита (включительно) </param> 
         public static ulong CutBitsWithBeginningAndEndingPlaces(ulong number, int beginningPlace, int endingPlace)
         {
-
             return GetLowBits(number, endingPlace + 1) >> beginningPlace;
         }
 

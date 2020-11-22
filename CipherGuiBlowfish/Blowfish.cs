@@ -242,6 +242,7 @@ namespace BlowfishAlgorithm
                 return ECB_Encrypt(text, userkey);
             }
 
+            // сплитим массив, каждый из которых будет шифроваться отдельным потоком
             byte[][] splitedText = FullTextToSplitedTextForThreads(text);
 
             // последний сплит с инфо блоком
@@ -249,10 +250,11 @@ namespace BlowfishAlgorithm
 
             uint[] roundsKeys = KeyGeneration(userkey);
 
+            // многопоточное шифрование
             Task<byte[]>[] allTasks = new Task<byte[]>[processorCount];
             for (int i = 0; i < processorCount; i++)
             {
-                int indexI = i; // т.к. значение i может поменяться EndInvoke
+                int indexI = i; // т.к. значение i может поменяться при EndInvoke
                 allTasks[indexI] = Task.Run(() => MultithreadedEncryptSplitedBlock_ForECB(splitedText[indexI], roundsKeys));
             }
             await Task.WhenAll(allTasks);
@@ -262,6 +264,7 @@ namespace BlowfishAlgorithm
                 splitedText[i] = allTasks[i].Result;
             }
 
+            // собираем все сплиты в 1 массив
             byte[] answer = SplitedTextToFullTextAfterThreads(splitedText);
             return answer;
         }
@@ -759,7 +762,7 @@ namespace BlowfishAlgorithm
             R[17] = R[16] ^ roundsKeys[16];
             L[17] = L[16] ^ roundsKeys[17];
 
-            // склеиваем половинки (НЕ ЗАБЫВАЕМ, КАК ЭТО ДЕЛАЕТСЯ, ТУТ ВНИМАТЕЛЬНЕЕ)
+            // склеиваем половинки
             ulong answer = (L[17] << 32) | R[17];
 
             return answer;
@@ -804,7 +807,7 @@ namespace BlowfishAlgorithm
             int j = 0;
             for (int i = 0; i < _P.Length; i++)
             {
-                answer[i] = _P[i] ^ CutUintWithBeginningByteNymeration(appendedUserKeys, j);
+                answer[i] = _P[i] ^ BitConverter.ToUInt32(appendedUserKeys,j) ;
                 j = (j + 4) % appendedUserKeys.Length;
             }
 
@@ -819,20 +822,9 @@ namespace BlowfishAlgorithm
                 return (byte[])key.Clone();
             }
 
-            byte[] answer = new byte[key.Length + (4 - key.Length%4)];
+            byte[] answer = new byte[key.Length + (4 - key.Length % 4)];
             Array.Copy(key, answer, key.Length);
 
-            return answer;
-        }
-
-        // Вырезаем uint из массива байтов, начиная с нумерации байта beginNymeration по 4 байта
-        private uint CutUintWithBeginningByteNymeration(byte[] userKey, int beginNymeration)
-        {
-            uint answer = 0;
-            for (int i = beginNymeration + 3; i >= beginNymeration; i--)
-            {
-                answer = ( answer<<8 ) | userKey[i];
-            }
             return answer;
         }
 
