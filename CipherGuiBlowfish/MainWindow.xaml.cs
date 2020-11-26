@@ -40,7 +40,7 @@ namespace CipherGuiBlowfish
         {
             if ((_userFile == null) || (_userFile.Length == 0))
             {
-                MyConsole.AppendText("Ошибка! Файл пуст или вы забыли его считать");
+                AppendInConsoleLine("Ошибка! Файл пуст или вы забыли его считать");
                 return;
             }
             if (UserKey.Password.Length == 0)
@@ -90,12 +90,12 @@ namespace CipherGuiBlowfish
         {
             if ((_userFile == null) || (_userFile.Length == 0))
             {
-                MyConsole.AppendText("Ошибка! Файл пуст или вы забыли его считать");
+                AppendInConsoleLine("Ошибка! Файл пуст или вы забыли его считать");
                 return;
             }
             if (UserKey.Password.Length == 0)
             {
-                MyConsole.AppendText("Ошибка! Не ввели пароль (он не может быть 0 символов)");
+                AppendInConsoleLine("Ошибка! Не ввели пароль (он не может быть 0 символов)");
                 return;
             }
 
